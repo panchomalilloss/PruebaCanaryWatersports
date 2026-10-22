@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String
+  createdAt    DateTime @default(now())
+}
+
+model Mutex {
+  key String @id
+}
+
+model Resource {
+  id         String            @id
+  name       String
+  capacity   Int
+  assumption Boolean           @default(false)
+  notes      String            @default("")
+  variants   VariantResource[]
+}
+
+model Activity {
+  id        String    @id
+  bookable  Boolean   @default(true)
+  sort      Int
+  image     String
+  isPack    Boolean   @default(false)
+  names     String
+  summaries String
+  variants  Variant[]
+}
+
+model Variant {
+  id               String            @id
+  activityId       String
+  activity         Activity          @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  durationMinutes  Int
+  bufferMinutes    Int               @default(0)
+  intervalMinutes  Int
+  slotRule         String
+  minParticipants  Int
+  maxParticipants  Int
+  participantStep  Int               @default(1)
+  priceCents       Int
+  pricingUnit      String
+  leadMinutes      Int               @default(180)
+  active           Boolean           @default(true)
+  sort             Int
+  focus            String
+  names            String
+  blurbs           String
+  allowSpectators  Boolean           @default(false)
+  resources        VariantResource[]
+  packComponents   PackComponent[]   @relation("Pack")
+  componentOf      PackComponent[]   @relation("Component")
+}
+
+model VariantResource {
+  variantId  String
+  resourceId String
+  basis      String
+  units      Int
+  groupSize  Int      @default(1)
+  variant    Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  resource   Resource @relation(fields: [resourceId], references: [id])
+
+  @@id([variantId, resourceId])
+}
+
+model PackComponent {
+  packVariantId      String
+  componentVariantId String
+  slotMode           String
+  sort               Int
+  pack               Variant @relation("Pack", fields: [packVariantId], references: [id], onDelete: Cascade)
+  component          Variant @relation("Component", fields: [componentVariantId], references: [id])
+
+  @@id([packVariantId, componentVariantId])
+}
+
+model Schedule {
+  id           String  @id @default(cuid())
+  activityId   String?
+  label        String
+  validFrom    String?
+  validTo      String?
+  weekdays     String
+  openMinutes  Int
+  closeMinutes Int
+  closed       Boolean @default(false)
+}
+
+model Block {
+  id           String  @id @default(cuid())
+  activityId   String?
+  date         String
+  endDate      String
+  startMinutes Int?
+  endMinutes   Int?
+  reason       String
+  kind         String
+  createdAt    DateTime @default(now())
+}
+
+model ExtraSlot {
+  id           String @id @default(cuid())
+  activityId   String
+  date         String
+  startMinutes Int
+}
+
+model Coupon {
+  code           String  @id
+  percentOff     Int?
+  amountOffCents Int?
+  active         Boolean @default(true)
+  note           String  @default("")
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  reference      String        @unique
+  idempotencyKey String?       @unique
+  status         String
+  locale         String
+  customerName   String
+  customerEmail  String
+  customerPhone  String
+  customerNotes  String        @default("")
+  staffNotes     String        @default("")
+  source         String
+  totalCents     Int
+  discountCents  Int           @default(0)
+  paidCents      Int           @default(0)
+  currency       String        @default("EUR")
+  holdExpiresAt  DateTime?
+  acceptTerms    Boolean
+  acceptSafety   Boolean
+  marketingOptIn Boolean       @default(false)
+  packVariantId  String?
+  participants   Int
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  items          BookingItem[]
+  payments       Payment[]
+  emails         EmailLog[]
+}
+
+model BookingItem {
+  id               String  @id @default(cuid())
+  bookingId        String
+  booking          Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  activityId       String
+  variantId        String
+  date             String
+  startMinutes     Int
+  endMinutes       Int
+  occupiedUntil    Int
+  participants     Int
+  spectators       Int     @default(0)
+  priceCents       Int
+  resourceSnapshot String
+
+  @@index([date, variantId])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider    String
+  providerRef String?
+  amountCents Int
+  kind        String
+  status      String
+  createdAt   DateTime @default(now())
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  to        String
+  subject   String
+  body      String
+  status    String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  detail    String
+  createdAt DateTime @default(now())
+}
